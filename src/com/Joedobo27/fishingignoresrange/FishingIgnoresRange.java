@@ -16,6 +16,8 @@ import org.gotti.wurmunlimited.modloader.interfaces.Initable;
 import org.gotti.wurmunlimited.modloader.interfaces.ServerStartedListener;
 import org.gotti.wurmunlimited.modloader.interfaces.WurmServerMod;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -36,7 +38,8 @@ public class FishingIgnoresRange implements WurmServerMod, Initable, ServerStart
                     if (Objects.equals("isWithinDistanceTo", methodCall.getMethodName())){
                             methodCall.replace("$_ = " +
                                     "com.Joedobo27.fishingignoresrange.FishingIgnoresRange.isWithinDistanceToHook(" +
-                                    "this.action, this.performer, this.posX, this.posY, this.posZ, 12.0f, 2.0f);");
+                                    "this.performer.getCurrentAction().getActionEntry(), this.performer, this.posX, this.posY," +
+                                    "this.posZ, 12.0f, 2.0f);");
                         fishingProximitySuccess[0] = true;
                     }
                 }
@@ -65,8 +68,12 @@ public class FishingIgnoresRange implements WurmServerMod, Initable, ServerStart
                 Short actionNumber = ReflectionUtil.getPrivateField(actionEntry,
                         ReflectionUtil.getField(actionEntryClass,"number"));
                 if (actionNumber == Actions.FISH){
+                    // This lets us target and fish on any targeted tile.
                     ReflectionUtil.setPrivateField(actionEntry, ReflectionUtil.getField(actionEntryClass,"ignoresRange"),
                             true);
+                    // Fishing default: ACTION_TYPE_BLOCKED_ALL_BUT_OPEN = 33 and blockType 5.
+                    // Change it to: ACTION_TYPE_BLOCKED_NONE = 29 or BlockType 0.
+                    ReflectionUtil.setPrivateField(actionEntry, ReflectionUtil.getField(actionEntryClass,"blockType"), 0);
                     fishingProximitySuccess = true;
                 }
             }
@@ -81,10 +88,41 @@ public class FishingIgnoresRange implements WurmServerMod, Initable, ServerStart
         }
     }
 
+    /**
+     * Reflective wrapper of WU package local method actionEntry.isIgnoresRange() in class ActionEntry.
+     *
+     * @param actionEntry ActionEntry WU object type.
+     * @return boolean type.
+     */
+    private static boolean isIgnoresRange(ActionEntry actionEntry){
+        try {
+            Method isIgnoresRange = ReflectionUtil.getMethod(Class.forName("com.wurmonline.server.behaviours.ActionEntry"), "isIgnoresRange");
+            isIgnoresRange.setAccessible(true);
+            return (boolean) isIgnoresRange.invoke(actionEntry);
+        }catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException | InvocationTargetException e){
+            logger.log(Level.WARNING, e.getMessage(), e.getCause());
+        }
+        return false;
+    }
+
+    /**
+     * This is a injected hook method whose returned value replaces what would be returned by WU isWithinDistanceTo() in Action class.
+     * It is used in JA ExprEditor code.
+     *
+     * @param actionEntry ActionEntry WU object type.
+     * @param performer Creature WU object type.
+     * @param aPosX float type.
+     * @param aPosY float type.
+     * @param aPosZ float type.
+     * @param maxDistance float type.
+     * @param modifier float type.
+     * @return boolean type.
+     */
     @SuppressWarnings("unused")
-    public static boolean isWithinDistanceToHook(short action, Creature performer, float aPosX, float aPosY, float aPosZ, float maxDistance, float modifier){
-        if (action == 160)
+    public static boolean isWithinDistanceToHook(ActionEntry actionEntry, Creature performer, float aPosX, float aPosY, float aPosZ, float maxDistance, float modifier){
+        if (isIgnoresRange(actionEntry))
             return true;
+        //if (action == 160)
         return Math.abs(performer.getStatus().getPositionX() - (aPosX + modifier)) < maxDistance && Math.abs(performer.getStatus().getPositionY() - (aPosY + modifier)) < maxDistance;
     }
 
