@@ -1,4 +1,4 @@
-package com.Joedobo27.fishingignoresrange;
+package com.joedobo27.fishingignoresrange;
 
 
 import com.wurmonline.mesh.MeshIO;
@@ -6,6 +6,7 @@ import com.wurmonline.mesh.Tiles;
 import com.wurmonline.server.behaviours.ActionEntry;
 import com.wurmonline.server.behaviours.Actions;
 import com.wurmonline.server.creatures.Creature;
+import com.wurmonline.server.items.ItemList;
 import com.wurmonline.server.zones.Zones;
 import javassist.CannotCompileException;
 import javassist.ClassPool;
@@ -100,7 +101,9 @@ public class FishingIgnoresRange implements WurmServerMod, Configurable, Initabl
             @Override
             public void edit(MethodCall methodCall) throws CannotCompileException {
                 if (Objects.equals("isWithinDistanceTo", methodCall.getMethodName())) {
-                    methodCall.replace("$_ = com.Joedobo27.fishingignoresrange.FishingIgnoresRange.isWithinDistanceToHook(" +
+                    logger.log(Level.FINE, poll.getCtMethod().getName() + " method,  edit call to " +
+                            methodCall.getMethodName() + " at index " + methodCall.getLineNumber());
+                    methodCall.replace("$_ = com.joedobo27.fishingignoresrange.FishingIgnoresRange.isWithinDistanceToHook(" +
                             "this.action, this.performer, this.posX, this.posY, this.posZ, 12.0f, 2.0f);");
                     fishingProximitySuccess[0] = true;
                 }
@@ -118,7 +121,7 @@ public class FishingIgnoresRange implements WurmServerMod, Configurable, Initabl
             return;
         final int[] fishWhileSwimmingSuccess = new int[]{0};
         final int[] fishInCaveSuccess = new int[]{0,0,0,0,0};
-        final int[] fishingInfoSuccess = new int[]{0};
+        final int[] fishingInfoSuccess = new int[]{0,0};
 
         JAssistClassData fishClass = new JAssistClassData("com.wurmonline.server.behaviours.Fish", classPool);
         JAssistMethodData fish = new JAssistMethodData(fishClass,
@@ -131,91 +134,92 @@ public class FishingIgnoresRange implements WurmServerMod, Configurable, Initabl
                 if (Objects.equals("getBridgeId", methodCall.getMethodName()) && fishWhileSwimming) {
                     // if (performer.getBridgeId() == -10L && ph < -10 && performer.getVehicle() == -10L) {
                     // change getBridgeId() so it always returns 1 and thus disables can't swim and fish.
+                    logger.log(Level.FINE, "fish method,  edit call to " +
+                            methodCall.getMethodName() + " at index " + methodCall.getLineNumber());
                     methodCall.replace("$_ = 1;");
                     fishWhileSwimmingSuccess[0] = 1;
-                } else if (Objects.equals("isOnSurface", methodCall.getMethodName()) && methodCall.getLineNumber() == 454
+                } 
+                else if (Objects.equals("isOnSurface", methodCall.getMethodName()) && methodCall.getLineNumber() == 447
                         && fishInCave) {
                     // if (performer.isOnSurface()) {
                     // have this always return true to aid changes for fishing in caves.
+                    logger.log(Level.FINE, "fish method,  edit call to " +
+                            methodCall.getMethodName() + " at index " + methodCall.getLineNumber());
                     methodCall.replace("$_ = true;");
                     fishInCaveSuccess[0] = 1;
-                } else if (Objects.equals("sendNormalServerMessage", methodCall.getMethodName()) && methodCall.getLineNumber() == 421 &&
+                }
+                /*
+                else if (Objects.equals("sendNormalServerMessage", methodCall.getMethodName()) && methodCall.getLineNumber() == 414 &&
                 fishingInfo) {
+                    logger.log(Level.FINE, "fish method,  edit call to " +
+                            methodCall.getMethodName() + " at index " + methodCall.getLineNumber());
                     // construct a new server message using data fetched with getFishMessage() and override the variable string
                     // passed into sendNormalServerMessage.
-                    methodCall.replace("$1 = com.Joedobo27.fishingignoresrange.FishingIgnoresRange.getFishMessageHook(" +
+                    methodCall.replace("$1 = com.joedobo27.fishingignoresrange.FishingIgnoresRange.getFishMessageHook(" +
                             "com.wurmonline.server.behaviours.Fish.mesh, tilex, tiley); $_ = $proceed($$);");
                     fishingInfoSuccess[0] = 1;
+                }
+                */
+                else if(Objects.equals("setTimeLeft", methodCall.getMethodName()) && methodCall.getLineNumber() == 421) {
+                    methodCall.replace("$1 = 1; $proceed($$);");
+                }
+                else if (Objects.equals("sendNormalServerMessage", methodCall.getMethodName()) && methodCall.getLineNumber() == 648 &&
+                fishingInfo) {
+                    logger.log(Level.FINE, "fish method,  edit call to " +
+                            methodCall.getMethodName() + " at index " + methodCall.getLineNumber());
+                    methodCall.replace("$1 = " +
+                            "com.joedobo27.fishingignoresrange.FishingIgnoresRange.getTooSmallMessageHook(weight, waterType, fishOnHook); " +
+                            "$_ = $proceed($$);");
+                    fishingInfoSuccess[0] = 1;
+                }
+                else if (Objects.equals("sendNormalServerMessage", methodCall.getMethodName()) && methodCall.getLineNumber() == 661 &&
+                fishingInfo) {
+                    logger.log(Level.FINE, "fish method,  edit call to " +
+                            methodCall.getMethodName() + " at index " + methodCall.getLineNumber());
+                    methodCall.replace("$1 = " +
+                            "com.joedobo27.fishingignoresrange.FishingIgnoresRange.getFishCaughtHook2(waterType, fishOnHook); " +
+                            "$_ = $proceed($$);");
+                    fishingInfoSuccess[1] = 1;
                 }
             }
 
             @Override
             public void edit(FieldAccess fieldAccess) throws CannotCompileException {
-                if (Objects.equals("surfaceMesh", fieldAccess.getFieldName()) && fieldAccess.getLineNumber() == 463 &&
+                // all four below are to replace  // Field com/wurmonline/server/Server.surfaceMesh:Lcom/wurmonline/mesh/MeshIO;
+                // with     com.wurmonline.server.behaviours.Fish.mesh;
+                if (Objects.equals("surfaceMesh", fieldAccess.getFieldName()) && fieldAccess.getLineNumber() == 456 &&
                         fishInCave) {
+                    logger.log(Level.FINE, fish.getCtMethod().getName() + " method,  edit call to " +
+                            fieldAccess.getFieldName() + " at index " + fieldAccess.getLineNumber());
                     fieldAccess.replace("$_ = com.wurmonline.server.behaviours.Fish.mesh;");
                     fishInCaveSuccess[1] = 1;
-                } else if ((Objects.equals("surfaceMesh", fieldAccess.getFieldName()) && fieldAccess.getLineNumber() == 480 &&
+                } else if ((Objects.equals("surfaceMesh", fieldAccess.getFieldName()) && fieldAccess.getLineNumber() == 473 &&
                         fishInCave)) {
+                    logger.log(Level.FINE, fish.getCtMethod().getName() + " method,  edit call to " +
+                            fieldAccess.getFieldName() + " at index " + fieldAccess.getLineNumber());
                     fieldAccess.replace("$_ = com.wurmonline.server.behaviours.Fish.mesh;");
                     fishInCaveSuccess[2] = 1;
-                } else if ((Objects.equals("surfaceMesh", fieldAccess.getFieldName()) && fieldAccess.getLineNumber() == 498 &&
+                } else if ((Objects.equals("surfaceMesh", fieldAccess.getFieldName()) && fieldAccess.getLineNumber() == 491 &&
                         fishInCave)) {
+                    logger.log(Level.FINE, fish.getCtMethod().getName() + " method,  edit call to " +
+                            fieldAccess.getFieldName() + " at index " + fieldAccess.getLineNumber());
                     fieldAccess.replace("$_ = com.wurmonline.server.behaviours.Fish.mesh;");
                     fishInCaveSuccess[3] = 1;
-                } else if ((Objects.equals("surfaceMesh", fieldAccess.getFieldName()) && fieldAccess.getLineNumber() == 515 &&
+                } else if ((Objects.equals("surfaceMesh", fieldAccess.getFieldName()) && fieldAccess.getLineNumber() == 508 &&
                         fishInCave)) {
+                    logger.log(Level.FINE, fish.getCtMethod().getName() + " method,  edit call to " +
+                            fieldAccess.getFieldName() + " at index " + fieldAccess.getLineNumber());
                     fieldAccess.replace("$_ = com.wurmonline.server.behaviours.Fish.mesh;");
                     fishInCaveSuccess[4] = 1;
                 }
             }
         });
-        boolean changesSuccessful;
-        if (fishWhileSwimming) {
-            changesSuccessful = !Arrays.stream(fishWhileSwimmingSuccess).anyMatch(value -> value == 0);
-            if (changesSuccessful) {
-                logger.log(Level.INFO, "fishWhileSwimming option changes SUCCESSFUL");
-            } else {
-                logger.log(Level.INFO, "fishWhileSwimming option changes FAILURE");
-                logger.log(Level.FINE, Arrays.toString(fishWhileSwimmingSuccess));
-            }
-        }
-        if (fishInCave) {
-            changesSuccessful = !Arrays.stream(fishInCaveSuccess).anyMatch(value -> value == 0);
-            if (changesSuccessful) {
-                logger.log(Level.INFO, "fishInCave option changes SUCCESSFUL");
-            } else {
-                logger.log(Level.INFO, "fishInCave option changes FAILURE");
-                logger.log(Level.FINE, Arrays.toString(fishInCaveSuccess));
-            }
-        }
-        if (fishingInfo) {
-            changesSuccessful = !Arrays.stream(fishingInfoSuccess).anyMatch(value -> value == 0);
-            if (changesSuccessful) {
-                logger.log(Level.INFO, "fishingInfo option changes SUCCESSFUL");
-            } else {
-                logger.log(Level.INFO, "fishingInfo option changes FAILURE");
-                logger.log(Level.FINE, Arrays.toString(fishingInfoSuccess));
-            }
-        }
-    }
-
-    /**
-     * Reflective wrapper of WU package local method actionEntry.isIgnoresRange() in class ActionEntry.
-     *
-     * @param actionEntry ActionEntry WU object type.
-     * @return boolean type.
-     */
-    @SuppressWarnings("unused")
-    private static boolean isIgnoresRange(ActionEntry actionEntry) {
-        try {
-            Method isIgnoresRange = ReflectionUtil.getMethod(Class.forName("com.wurmonline.server.behaviours.ActionEntry"), "isIgnoresRange");
-            isIgnoresRange.setAccessible(true);
-            return (boolean) isIgnoresRange.invoke(actionEntry);
-        } catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
-            logger.log(Level.WARNING, e.getMessage(), e.getCause());
-        }
-        return false;
+        if (fishWhileSwimming)
+            evaluateChangesArray(fishWhileSwimmingSuccess, "fishWhileSwimming");
+        if (fishInCave)
+            evaluateChangesArray(fishInCaveSuccess, "fishInCave");
+        if (fishingInfo)
+            evaluateChangesArray(fishingInfoSuccess, "fishingInfo");
     }
 
     /**
@@ -233,9 +237,104 @@ public class FishingIgnoresRange implements WurmServerMod, Configurable, Initabl
      */
     @SuppressWarnings("unused")
     public static boolean isWithinDistanceToHook(int action, Creature performer, float aPosX, float aPosY, float aPosZ, float maxDistance, float modifier) {
-        if (action == 160)
+        //noinspection SimplifiableIfStatement
+        if (action == Actions.FISH) // 160
             return true;
         return Math.abs(performer.getStatus().getPositionX() - (aPosX + modifier)) < maxDistance && Math.abs(performer.getStatus().getPositionY() - (aPosY + modifier)) < maxDistance;
+    }
+
+    @SuppressWarnings("unused")
+    public static String getTooSmallMessageHook(int weight, int waterType2, short fishOnHook){
+        String waterName = getWaterName(waterType2);
+        String fishName = getFishName(fishOnHook);
+        return String.format("The %d gram %s from the %s is too small and escapes.", weight, fishName, waterName);
+    }
+
+    private static String getWaterName(int waterType2){
+        String waterName = "pond";
+        if (waterType2 >= 20000) {
+            waterName = "pond";
+        }
+        else if (waterType2 >= 7500) {
+            waterName = "lake";
+        }
+        else if (waterType2 >= 5000) {
+            waterName = "deep sea";
+        }
+        return waterName;
+    }
+
+    private static String getFishName(short fishOnHook){
+        String fishName = "";
+        switch (fishOnHook){
+            case ItemList.deadPerch :
+                // 163
+                fishName = "Perch";
+                break;
+            case ItemList.deadRoach :
+                // 162
+                fishName = "Roach";
+                break;
+            case ItemList.deadTrout :
+                // 165
+                fishName = "Trout";
+                break;
+            case ItemList.deadPike :
+                // 157
+                fishName = "Pike";
+                break;
+            case ItemList.deadCatFish :
+                // 160
+                fishName = "Catfish";
+                break;
+            case ItemList.deadHerring :
+                // 159
+                fishName = "Herring";
+                break;
+            case ItemList.deadCarp :
+                // 164
+                fishName = "Carp";
+                break;
+            case ItemList.deadBass :
+                // 158
+                fishName = "Bass";
+                break;
+            case ItemList.deadOctopus :
+                // 572
+                fishName = "Octopus";
+                break;
+            case ItemList.deadMarlin :
+                // 569
+                fishName = "Marlin";
+                break;
+            case ItemList.deadSharkBlue :
+                // 570
+                fishName = "Blue shark";
+                break;
+            case ItemList.deadDorado :
+                // 574
+                fishName = "Dorado";
+                break;
+            case ItemList.deadSailFish :
+                // 573
+                fishName = "Sailfish";
+                break;
+            case ItemList.deadSharkWhite :
+                // 571
+                fishName = "SharkWhite";
+                break;
+            case ItemList.deadTuna :
+                // 575
+                fishName = "Tuna";
+        }
+        return fishName;
+    }
+
+    @SuppressWarnings("unused")
+    public static String getFishCaughtHook2(int waterType2, short fishOnHook) {
+        String waterName = getWaterName(waterType2);
+        String fishName = getFishName(fishOnHook);
+        return String.format("You think there is a %s on the hook from the %s.", fishName, waterName);
     }
 
     /**
@@ -329,6 +428,15 @@ public class FishingIgnoresRange implements WurmServerMod, Configurable, Initabl
         return String.format("You throw out the line and start fishing in the %s. It's at most %d deep near here.", waterType, maxDepth);
     }
 
+    private static void evaluateChangesArray(int[] ints, String option) {
+        boolean changesSuccessful = Arrays.stream(ints).noneMatch(value -> value == 0);
+        if (changesSuccessful) {
+            logger.log(Level.INFO, option + " option changes SUCCESSFUL");
+        } else {
+            logger.log(Level.INFO, option + " option changes FAILURE");
+            logger.log(Level.FINE, Arrays.toString(ints));
+        }
+    }
 
     static {
         logger = Logger.getLogger(FishingIgnoresRange.class.getName());

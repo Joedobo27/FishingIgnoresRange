@@ -1,4 +1,4 @@
-package com.Joedobo27.fishingignoresrange;
+package com.joedobo27.fishingignoresrange;
 
 import javassist.ClassPool;
 import javassist.CtClass;
